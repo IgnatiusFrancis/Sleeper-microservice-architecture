@@ -1,47 +1,48 @@
-import { Injectable, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
-import * as bcrypt from "bcryptjs";
+import {
+  Injectable,
+  UnauthorizedException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UsersRepository } from './users.repository';
 import { GetUserDto } from './dto/get-user.dto';
 
 @Injectable()
 export class UsersService {
-    constructor(private readonly usersRepository: UsersRepository){}
+  constructor(private readonly usersRepository: UsersRepository) {}
 
-    async create(createUserDto: CreateUserDto){
+  async create(createUserDto: CreateUserDto) {
+    await this.validateCreateUserDto(createUserDto);
 
-await this.validateCreateUserDto(createUserDto)
+    return this.usersRepository.create({
+      ...createUserDto,
+      password: await bcrypt.hash(createUserDto.password, 10),
+    });
+  }
 
-        return this.usersRepository.create({
-            ...createUserDto, password: await bcrypt.hash(createUserDto.password, 10)
-        })
+  private async validateCreateUserDto(createUserDto: CreateUserDto) {
+    try {
+      await this.usersRepository.findOne({ email: createUserDto.email });
+    } catch (error) {
+      return;
     }
 
-    private async validateCreateUserDto(createUserDto: CreateUserDto){
-        try {
-            await this.usersRepository.findOne({email: createUserDto.email})
-        } catch (error) {
-            return
-        }
+    throw new UnprocessableEntityException('Email already exists.');
+  }
 
-        throw new UnprocessableEntityException("Email already exists.")
-    }
-
-async verifyUser(email: string, passport: string){
-    const user = await this.usersRepository.findOne({email})
-    const passwordIsValid = await bcrypt.compare(passport, user.password)
+  async verifyUser(email: string, passport: string) {
+    const user = await this.usersRepository.findOne({ email });
+    const passwordIsValid = await bcrypt.compare(passport, user.password);
 
     if (!passwordIsValid) {
-        throw new UnauthorizedException('Credentials are not valid')
-        
+      throw new UnauthorizedException('Credentials are not valid');
     }
 
-    return user
-}
+    return user;
+  }
 
-async getUser(getUserDto: GetUserDto){
-    return this.usersRepository.findOne(getUserDto)
-}
-
-
+  async getUser(getUserDto: GetUserDto) {
+    return this.usersRepository.findOne(getUserDto);
+  }
 }
